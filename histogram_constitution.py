@@ -20,7 +20,6 @@ class HistConstitucionScene(Scene):
         rectangles=self.get_histogram_bars(axes)[0]
         texto=self.get_histogram_bars(axes)[1]
         self.play(Create(axes),FadeIn(rectangles),Write(texto)) #hay que sacar los text
-        
         self.wait()
     def get_histogram_bars(self,axes):
         bars=VGroup()
