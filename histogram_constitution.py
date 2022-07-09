@@ -1,19 +1,15 @@
-from manimlib.imports import *
+from manim import *
 class ShowDistributionOfScores(Scene):
     CONFIG = {
         "axes_config": {
-            "x_min": -1,
-            "x_max": 10,
+            'x_range': [0,10,1],
             "x_axis_config": {
                 "unit_size": 1.2,
-                "tick_frequency": 1,
             },
-            "y_min": 0,
-            "y_max": 100,
+            'y_range': [0, 100, 10],
             "y_axis_config": {
                 "unit_size": 0.065,
-                "tick_frequency": 10,
-                "include_tip": False,
+                "include_tip": True,
             },
         },
         "random_seed": 1,
@@ -44,7 +40,7 @@ class ShowDistributionOfScores(Scene):
 
         # Add score label
         score_label = VGroup(
-            TextMobject("Last score: "),
+            Text("Last score: "),
             Integer(1)
         )
         score_label.scale(1.5)
@@ -59,7 +55,7 @@ class ShowDistributionOfScores(Scene):
         )
 
         n_trials_label = VGroup(
-            TextMobject("\\# Games: "),
+            Text("\\# Games: "),
             Integer(0),
         )
         n_trials_label.scale(1.5)
@@ -97,7 +93,7 @@ class ShowDistributionOfScores(Scene):
             lambda m: m.move_to(axes.c2p(get_mean(), 0), DOWN)
         )
         mean_label = VGroup(
-            TextMobject("Mean = "),
+            Text("Mean = "),
             DecimalNumber(num_decimal_places=3),
         )
         mean_label.arrange(RIGHT)
@@ -109,11 +105,7 @@ class ShowDistributionOfScores(Scene):
         index_tracker.set_value(1)
         for value in [10, 100, 1000, 10000]:
             anims = [
-                ApplyMethod(
-                    index_tracker.set_value, value,
-                    rate_func=linear,
-                    run_time=5,
-                ),
+                    index_tracker.animate.set_value(value),
             ]
             if value == 10:
                 anims.append(
@@ -128,22 +120,22 @@ class ShowDistributionOfScores(Scene):
 
     #
     def get_axes(self):
-        axes = Axes(**self.axes_config)
+        axes = Axes(**self.CONFIG['axes_config'])
         axes.to_corner(DL)
 
-        axes.x_axis.add_numbers(*range(1, 12))
-        axes.y_axis.add_numbers(
-            *range(20, 120, 20),
-            number_config={
-                "unit": "\\%"
-            }
-        )
-        x_label = TextMobject("Score")
+        # axes.x_axis.add_numbers(*range(1, 12))
+        # axes.y_axis.add_numbers(
+        #     *range(20, 120, 20),
+        #     number_config={
+        #         "unit": "\\%"
+        #     }
+        # )
+        x_label = Text("Score")
         x_label.next_to(axes.x_axis.get_right(), UR, buff=0.5)
         x_label.shift_onto_screen()
         axes.x_axis.add(x_label)
 
-        y_label = TextMobject("Relative proportion")
+        y_label = Text("Relative proportion")
         y_label.next_to(axes.y_axis.get_top(), RIGHT, buff=0.75)
         y_label.to_edge(UP, buff=MED_SMALL_BUFF)
         axes.y_axis.add(y_label)
@@ -175,9 +167,8 @@ class ShowDistributionOfScores(Scene):
         epsilon = 1e-6
         for bar in bars:
             prop = prop_map.get(bar.x, epsilon)
-            bar.set_height(
-                prop * axes.y_axis.unit_size * 100,
-                stretch=True,
+            bar.stretch_to_fit_height(
+                prop * axes.y_axis.unit_size * 1000,
                 about_edge=DOWN,
             )
 
@@ -186,7 +177,7 @@ class ShowDistributionOfScores(Scene):
         radius = 1
         while True:
             point = np.random.uniform(-1, 1, size=2)
-            hit_radius = get_norm(point)
+            hit_radius = np.linalg.norm(point)
             if hit_radius > radius:
                 return score
             else:
