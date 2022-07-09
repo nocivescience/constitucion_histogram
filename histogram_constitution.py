@@ -17,9 +17,9 @@ class HistConstitucionScene(Scene):
     }
     def construct(self):
         axes=Axes(**self.CONFIG['axes_config']).to_edge(DOWN,buff=1)
-        rectangles=self.get_histogram_bars(axes)[0]
-        texto=self.get_histogram_bars(axes)[1]
-        self.play(Create(axes),FadeIn(rectangles),Write(texto)) #hay que sacar los text
+        rectangles=self.get_histogram_bars(axes)
+        self.play(Create(axes),FadeIn(rectangles)) #hay que sacar los text
+        
         self.wait()
     def get_histogram_bars(self,axes):
         bars=VGroup()
@@ -34,11 +34,13 @@ class HistConstitucionScene(Scene):
             (s,np.sum(scores==s)/n_scores)
             for s in set_scores
         ])
-        texto=Text('hola')
+        epsilon=1e-6
         for i,color in zip(range(self.CONFIG['axes_config']['x_range'][1]),self.CONFIG['colors']):
             bar=Rectangle(height=scores[i],width=self.CONFIG['axes_config']['x_range'][2]+3,color=BLUE).set_fill(color,1).move_to(axes.c2p(i+1,0),DOWN)
+            prop=sort_score.get(i,0)
+            bar.stretch_to_fit_height(prop*self.CONFIG['axes_config']['y_length'],about_edge=DOWN)
             bars.add(bar)
-        return [bars,texto]
+        return bars
     def get_random_height(self):
         score=1
         radius=1
