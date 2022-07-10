@@ -1,90 +1,181 @@
-from turtle import right
 from manim import *
-class ConstScene(Scene):
-    CONFIG={
-        'axis_config':{
-            'x_range':[0,3,1],
+class ShowDistributionOfScores(Scene):
+    CONFIG = {
+        "axes_config": {
+            'x_range':[0,10,1],
+            "x_axis_config": {
+                "unit_size": 1.2,
+            },
             'y_range':[0,100,10],
-            'x_axis_config':{
-                'unit_size':{
-                    'unit_size':1.2
-                }
+            "y_axis_config": {
+                "unit_size": 0.065,
+                "include_tip": False,
             },
-            'y_axis_config':{
-                'unit_size':{
-                    'unit_size':.065
-                },    
-            },
-            'y_length':4,
-            'x_length':7,
         },
-        'n_scores':10,
+        "random_seed": 1,
     }
+
     def construct(self):
-        rectangle=Rectangle(height=1,width=1)
-        # drawing the axes
-        axes_hist=self.get_axes_hist()
-        n_scores=self.CONFIG['n_scores']
-        random_points=self.get_random_scores()
-        scores=np.array([
-            random_points
-            for _ in range(n_scores)
-        ])
-        index_tracker=ValueTracker(n_scores)
+        # Add axes
+        axes = self.get_axes()
+        self.add(axes)
+
+        # setup scores
+        n_scores = 10000
+        scores = np.array([self.get_random_score() for x in range(n_scores)])
+        index_tracker = ValueTracker(n_scores)
+
         def get_index():
-            value = np.random.random()*axes_hist.y_axis.unit_size
-            return value
-        bars=self.get_rectangles(axes_hist)
+            value = np.clip(index_tracker.get_value(), 0, n_scores - 1)
+            return int(value)
+
+        # Setup histogram
+        bars = self.get_histogram_bars(axes)
         bars.add_updater(
-            lambda b: self.set_histogram_bars(b,scores[:get_index()],axes_hist)
+            lambda b: self.set_histogram_bars(
+                b, scores[:get_index()], axes
+            )
         )
-        self.add(bars,axes_hist)
+        self.add(bars)
+
+        # Add score label
+        score_label = VGroup(
+            Text("Last score: "),
+            Integer(1)
+        )
+        score_label.scale(1.5)
+        score_label.arrange(RIGHT)
+        score_label[1].align_to(score_label[0][0][-1], DOWN)
+
+        score_label[1].add_updater(
+            lambda m: m.set_value(scores[get_index() - 1])
+        )
+        score_label[1].add_updater(
+            lambda m: m.set_fill(bars[scores[get_index() - 1]].get_fill_color())
+        )
+
+        n_trials_label = VGroup(
+            Text("\\# Games: "),
+            Integer(0),
+        )
+        n_trials_label.scale(1.5)
+        n_trials_label.arrange(RIGHT, aligned_edge=UP)
+        n_trials_label[1].add_updater(
+            lambda m: m.set_value(get_index())
+        )
+
+        n_trials_label.to_corner(UR, buff=LARGE_BUFF)
+        score_label.next_to(
+            n_trials_label, DOWN,
+            buff=LARGE_BUFF,
+            aligned_edge=LEFT,
+        )
+
+        self.add(score_label)
+        self.add(n_trials_label)
+
+        # Add curr_score_arrow
+        curr_score_arrow = Arrow(0.25 * UP, ORIGIN, buff=0)
+        curr_score_arrow.set_stroke(WHITE, 5)
+        curr_score_arrow.add_updater(
+            lambda m: m.next_to(bars[scores[get_index() - 1] - 1], UP, SMALL_BUFF)
+        )
+        self.add(curr_score_arrow)
+
+        # Add mean bar
+        mean_line = DashedLine(ORIGIN, 4 * UP)
+        mean_line.set_stroke(YELLOW, 2)
+
+        def get_mean():
+            return np.mean(scores[:get_index()])
+
+        mean_line.add_updater(
+            lambda m: m.move_to(axes.c2p(get_mean(), 0), DOWN)
+        )
+        mean_label = VGroup(
+            Text("Mean = "),
+            DecimalNumber(num_decimal_places=3),
+        )
+        mean_label.arrange(RIGHT)
+        mean_label.match_color(mean_line)
+        mean_label.add_updater(lambda m: m.next_to(mean_line, UP, SMALL_BUFF))
+        mean_label[1].add_updater(lambda m: m.set_value(get_mean()))
+
+        # Show many runs
         index_tracker.set_value(1)
-        for value in [10,100]:
-            anims=[
+        for value in [10, 100, 1000, 10000]:
+            anims = [
                 ApplyMethod(
-                    index_tracker.set_value,value,
+                    index_tracker.set_value, value,
                     rate_func=linear,
                     run_time=5,
-                )
+                ),
             ]
+            if value == 10:
+                anims.append(
+                    FadeIn(
+                        VGroup(mean_line, mean_label),
+                        rate_func=squish_rate_func(smooth, 0.5, 1),
+                        run_time=2,
+                    ),
+                )
             self.play(*anims)
         self.wait()
-    def get_axes_hist(self):
-        axes=Axes(**self.CONFIG['axis_config'])
+
+    #
+    def get_axes(self):
+        axes = Axes(**self.CONFIG['axes_config'])
+        axes.to_corner(DL)
+        x_label = Text("Score")
+        x_label.next_to(axes.x_axis.get_right(), UR, buff=0.5)
+        x_label.shift_onto_screen()
+        axes.x_axis.add(x_label)
+
+        y_label = Text("Relative proportion")
+        y_label.next_to(axes.y_axis.get_top(), RIGHT, buff=0.75)
+        y_label.to_edge(UP, buff=MED_SMALL_BUFF)
+        axes.y_axis.add(y_label)
+
         return axes
-    def get_rectangles(self,axes):
-        rectangles=VGroup()
-        for i in [1,2]:
-            coord_rect=axes.coords_to_point(i,0)
-            rectangle=Rectangle(width=2).move_to(coord_rect,DOWN).set_fill(color=RED,opacity=1)
-            rectangle.i=i
-            rectangles.add(rectangle)
-        return rectangles
+
+    def get_histogram_bars(self, axes):
+        bars = VGroup()
+        for x in range(1, 10):
+            bar = Rectangle(width=axes.x_axis.unit_size)
+            bar.move_to(axes.c2p(x, 0), DOWN)
+            bar.x = x
+            bars.add(bar)
+        bars.set_fill(opacity=0.7)
+        bars.set_color_by_gradient(BLUE, YELLOW, RED)
+        bars.set_stroke(WHITE, 1)
+        return bars
+
     def get_relative_proportion_map(self, all_scores):
-        score=set(all_scores)
-        n_scores=len(score)
+        scores = set(all_scores)
+        n_scores = len(all_scores)
         return dict([
-            (s,np.sum(all_scores==s)/n_scores)
-            for s in score
+            (s, np.sum(all_scores == s) / n_scores)
+            for s in set(scores)
         ])
-    def set_histogram_bars(self,bars,scores,axes):
-        prop_map=self.get_relative_proportion_map(scores)
-        epsilon=1e-6
+
+    def set_histogram_bars(self, bars, scores, axes):
+        prop_map = self.get_relative_proportion_map(scores)
+        epsilon = 1e-6
         for bar in bars:
-            prop=prop_map.get(bar.i,epsilon)
+            prop = prop_map.get(bar.x, epsilon)
             bar.stretch_to_fit_height(
-                prop*axes.y_axis.unit_size*100,
+                prop * axes.y_axis.unit_size * 100,
                 about_edge=DOWN,
             )
-    def get_random_scores(self):
-        score=1
-        radius=1
+
+    def get_random_score(self):
+        score = 1
+        radius = 1
         while True:
-            point =np.random.uniform(-1,1,size=2)
-            hit_radius=np.linalg.norm(point)
-            if hit_radius>radius:
+            point = np.random.uniform(-1, 1, size=2)
+            hit_radius = np.linalg.norm(point)
+            if hit_radius > radius:
                 return score
             else:
-                score+=1
-                radius=np.sqrt(radius**2-hit_radius**2)
+                score += 1
+                radius = np.sqrt(radius**2 - hit_radius**2)
